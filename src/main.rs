@@ -11,7 +11,7 @@ fn main() {
     for stream in listener.incoming() {
         match stream {
             Ok(mut _stream) => {
-                stream_handler(&_stream);
+                stream_handler(_stream);
             }
             Err(e) => {
                 println!("error: {}", e);
@@ -20,12 +20,14 @@ fn main() {
     }
 }
 
+#[derive(Debug)]
 struct Request {
     request_line: RequestLine,
     // raw: String,
     // headers: Option<Vec<String>>
 }
 
+#[derive(Debug)]
 struct RequestLine {
     path: String,
     // method: String,
@@ -33,9 +35,13 @@ struct RequestLine {
 }
 
 fn stream_reader(mut stream: &TcpStream) -> String {
-    let mut buf = String::new();
-    stream.read_to_string(&mut buf).expect("Could not read stream.");
-    buf
+    let mut buffer = [0; 1024];
+    let n = stream
+        .read(&mut buffer[..])
+        .expect("Could not read bytes from stream.");
+    str::from_utf8(&buffer[..n])
+        .expect("Could not convert bytes to string")
+        .to_string()
 }
 
 fn stream_parser(buf: String) -> anyhow::Result<Request> {
@@ -60,19 +66,11 @@ fn stream_parser(buf: String) -> anyhow::Result<Request> {
     }
 }
 
-fn stream_write_ok(mut stream: &TcpStream) {
-    let buf = "HTTP/1.1 200 OK\r\n\r\n".as_bytes();
-    stream.write_all(buf).expect("failed to write to stream");
-}
-
-fn stream_write_error(mut stream: &TcpStream) {
-    let buf = "HTTP/1.1 404 Not Found\r\n\r\n".as_bytes();
-    stream.write_all(buf).expect("failed to write to stream");
-}
-
-fn stream_handler(stream: &TcpStream) {
-    let stream_str = stream_reader(stream);
+fn stream_handler(stream: TcpStream) {
+    let stream_str = stream_reader(&stream);
+    // println!("stream_str: {}", stream_str);
     let req = stream_parser(stream_str);
+    // println!("req: {:#?}", req);
     match req {
         Ok(r) => {
             request_handler(stream, r);
@@ -93,13 +91,21 @@ fn request_line_parser(req_line: &str) -> RequestLine {
     }
 }
 
-fn request_handler(stream: &TcpStream, req: Request) {
+fn request_handler(mut stream: TcpStream, req: Request) {
     match req.request_line.path.as_str() {
         "/" => {
-            stream_write_ok(stream);
+            // println!("made it to stream_write_ok");
+            let buf = "HTTP/1.1 200 OK\r\n\r\n".as_bytes();
+            stream
+                .write_all(buf)
+                .expect("failed to write to stream");
         }
         _ => {
-            stream_write_error(stream);
+            // println!("made it to stream_write_error");
+            let buf = "HTTP/1.1 404 Not Found\r\n\r\n".as_bytes();
+            stream
+                .write_all(buf)
+                .expect("failed to write to stream");
         }
     }
 }
