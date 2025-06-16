@@ -24,6 +24,7 @@ fn main() {
 #[derive(Debug)]
 struct Request {
     request_line: RequestLine,
+    user_agent: String,
     // body: Option<String>,
     // raw: String,
     // headers: Option<Vec<String>>
@@ -42,6 +43,17 @@ struct Response {
     code: u16,
     status: String,
     body: String,
+}
+
+impl Default for Response {
+    fn default() -> Self {
+        Self {
+            protocol: String::from("HTTP/1.1"),
+            code: 200,
+            status: String::from("OK"),
+            body: Default::default(),
+        }
+    }
 }
 
 impl fmt::Display for Response {
@@ -73,11 +85,11 @@ fn stream_parser(buf: String) -> anyhow::Result<Request> {
         n if n.len() > 1 => {
             Ok(Request {
                 request_line: request_line_parser(&n[0]),
-                // body: n.last().cloned(), // raw: buf.clone(),
-                // headers: Some(n[1.. ]
-                //     .iter()
-                //     .map(String::from)
-                //     .collect::<Vec<String>>())
+                user_agent: user_agent_parser(&n[2]), // body: n.last().cloned(), // raw: buf.clone(),
+                                                      // headers: Some(n[1.. ]
+                                                      //     .iter()
+                                                      //     .map(String::from)
+                                                      //     .collect::<Vec<String>>())
             })
         }
         _ => Err(anyhow!("Empty request")),
@@ -111,11 +123,18 @@ fn request_line_parser(req_line: &str) -> RequestLine {
     }
 }
 
+fn user_agent_parser(line: &str) -> String {
+    let str_split = line.split_once(" ").unwrap_or_default();
+    str_split.1.to_string()
+}
+
 fn request_handler(stream: TcpStream, req: Request) {
     let prefix_echo = String::from("/echo/");
+    let prefix_user_agent = String::from("/user-agent");
     match req.request_line.path.as_str() {
         "/" => respond_ok(stream),
         r if r.starts_with(&prefix_echo) => respond_echo(stream, req, &prefix_echo),
+        r if r.starts_with(&prefix_user_agent) => respond_user_agent(stream, req),
         _ => respond_error(stream),
     }
 }
@@ -133,10 +152,17 @@ fn respond_echo(stream: TcpStream, req: Request, prefix: &str) {
         .unwrap_or_default()
         .to_string();
     let res = Response {
-        protocol: "HTTP/1.1".to_string(),
-        code: 200,
-        status: "OK".to_string(),
         body,
+        ..Default::default()
+    };
+    stream_write_string(stream, &res.to_string());
+}
+
+fn respond_user_agent(stream: TcpStream, req: Request) {
+    let body = req.user_agent;
+    let res = Response {
+        body,
+        ..Default::default()
     };
     stream_write_string(stream, &res.to_string());
 }
