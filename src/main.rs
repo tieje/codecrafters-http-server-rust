@@ -1,13 +1,14 @@
-use std::io::{Read, Write};
 #[allow(unused_imports)]
-use std::net::{TcpListener,TcpStream};
-use anyhow::{anyhow};
+use anyhow::anyhow;
+use std::io::{Read, Write};
+use std::net::{TcpListener, TcpStream};
+use std::fmt;
 
 fn main() {
     println!("Logs from your program will appear here!");
-    
+
     let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
-    
+
     for stream in listener.incoming() {
         match stream {
             Ok(mut _stream) => {
@@ -23,6 +24,7 @@ fn main() {
 #[derive(Debug)]
 struct Request {
     request_line: RequestLine,
+    // body: Option<String>,
     // raw: String,
     // headers: Option<Vec<String>>
 }
@@ -32,6 +34,24 @@ struct RequestLine {
     path: String,
     // method: String,
     // protocol: String
+}
+
+#[derive(Debug)]
+struct Response {
+    protocol: String,
+    code: u16,
+    status: String,
+    body: String,
+}
+
+impl fmt::Display for Response {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let _ = f.write_str(&format!("{} {} {}\r\n", self.protocol, self.code, self.status));
+        let _ = f.write_str("Content-Type: text/plain\r\n");
+        let _ = f.write_str(&format!("Content-Length: {}\r\n\r\n", self.body.len()));
+        let _ = f.write_str(&self.body);
+        Ok(())
+    }
 }
 
 fn stream_reader(mut stream: &TcpStream) -> String {
@@ -45,24 +65,19 @@ fn stream_reader(mut stream: &TcpStream) -> String {
 }
 
 fn stream_parser(buf: String) -> anyhow::Result<Request> {
-    let request = buf
-        .split("\r\n")
-        .map(String::from)
-        .collect::<Vec<String>>();
+    let request = buf.split("\r\n").map(String::from).collect::<Vec<String>>();
     match request {
         n if n.len() > 1 => {
             Ok(Request {
                 request_line: request_line_parser(&n[0]),
-                // raw: buf.clone(),
+                // body: n.last().cloned(), // raw: buf.clone(),
                 // headers: Some(n[1.. ]
                 //     .iter()
                 //     .map(String::from)
                 //     .collect::<Vec<String>>())
             })
         }
-        _ => {
-            Err(anyhow!("Empty request"))
-        }
+        _ => Err(anyhow!("Empty request")),
     }
 }
 
@@ -75,7 +90,9 @@ fn stream_handler(stream: TcpStream) {
         Ok(r) => {
             request_handler(stream, r);
         }
-        Err(e) => {println!("{}", e)}
+        Err(e) => {
+            println!("{}", e)
+        }
     }
 }
 
@@ -91,21 +108,43 @@ fn request_line_parser(req_line: &str) -> RequestLine {
     }
 }
 
-fn request_handler(mut stream: TcpStream, req: Request) {
+fn request_handler(stream: TcpStream, req: Request) {
+    let prefix_echo = String::from("/echo/");
     match req.request_line.path.as_str() {
-        "/" => {
-            // println!("made it to stream_write_ok");
-            let buf = "HTTP/1.1 200 OK\r\n\r\n".as_bytes();
-            stream
-                .write_all(buf)
-                .expect("failed to write to stream");
-        }
-        _ => {
-            // println!("made it to stream_write_error");
-            let buf = "HTTP/1.1 404 Not Found\r\n\r\n".as_bytes();
-            stream
-                .write_all(buf)
-                .expect("failed to write to stream");
-        }
+        "/" => respond_ok(stream),
+        r if r.starts_with(&prefix_echo) => respond_echo(stream, req, &prefix_echo),
+        _ => respond_error(stream),
     }
+}
+
+fn respond_ok(stream: TcpStream) {
+    let buf = String::from("HTTP/1.1 200 OK\r\n\r\n");
+    stream_write_string(stream, &buf);
+}
+
+fn respond_echo(stream: TcpStream, req: Request, prefix: &str) {
+    let body = req
+        .request_line
+        .path
+        .strip_prefix(prefix)
+        .unwrap_or_default()
+        .to_string();
+    let res = Response {
+        protocol: "HTTP/1.1".to_string(),
+        code: 200,
+        status: "OK".to_string(),
+        body,
+    };
+    stream_write_string(stream, &res.to_string());
+}
+
+fn respond_error(stream: TcpStream) {
+    let buf = String::from("HTTP/1.1 404 Not Found\r\n\r\n");
+    stream_write_string(stream, &buf);
+}
+
+fn stream_write_string(mut stream: TcpStream, buf: &str) {
+    stream
+        .write_all(buf.as_bytes())
+        .expect("Failed to write to stream.")
 }
