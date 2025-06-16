@@ -1,8 +1,8 @@
 #[allow(unused_imports)]
 use anyhow::anyhow;
+use std::fmt;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::fmt;
 
 fn main() {
     println!("Logs from your program will appear here!");
@@ -46,7 +46,10 @@ struct Response {
 
 impl fmt::Display for Response {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let _ = f.write_str(&format!("{} {} {}\r\n", self.protocol, self.code, self.status));
+        let _ = f.write_str(&format!(
+            "{} {} {}\r\n",
+            self.protocol, self.code, self.status
+        ));
         let _ = f.write_str("Content-Type: text/plain\r\n");
         let _ = f.write_str(&format!("Content-Length: {}\r\n\r\n", self.body.len()));
         let _ = f.write_str(&self.body);
