@@ -1,5 +1,6 @@
 #[allow(unused_imports)]
 use anyhow::anyhow;
+use codecrafters_http_server::ThreadPool;
 use std::fmt;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -8,11 +9,14 @@ fn main() {
     println!("Logs from your program will appear here!");
 
     let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
+    let pool = ThreadPool::new(10);
 
     for stream in listener.incoming() {
         match stream {
             Ok(mut _stream) => {
-                stream_handler(_stream);
+                pool.execute(|| {
+                    handle_connection(_stream);
+                });
             }
             Err(e) => {
                 println!("error: {}", e);
@@ -96,7 +100,7 @@ fn stream_parser(buf: String) -> anyhow::Result<Request> {
     }
 }
 
-fn stream_handler(stream: TcpStream) {
+fn handle_connection(stream: TcpStream) {
     let stream_str = stream_reader(&stream);
     // println!("stream_str: {}", stream_str);
     let req = stream_parser(stream_str);
