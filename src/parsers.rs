@@ -8,6 +8,15 @@ pub struct RequestLine {
     // protocol: String
 }
 
+impl RequestLine {
+    pub fn get_sub_path(self, prefix: &str) -> String {
+        self.path
+            .strip_prefix(prefix)
+            .unwrap_or_default()
+            .to_string()
+    }
+}
+
 pub fn request_line_parser(req_line: &str) -> RequestLine {
     let req_split = req_line
         .split_whitespace()

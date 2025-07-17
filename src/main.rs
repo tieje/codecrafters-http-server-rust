@@ -9,7 +9,6 @@ mod threads;
 fn main() {
     println!("Logs from your program will appear here!");
 
-    // TODO On start up create files in /tmp/folder
     let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
     let pool = ThreadPool::new(10);
 
