@@ -50,7 +50,7 @@ impl ThreadPool {
     }
 }
 
-pub struct Worker {
+struct Worker {
     id: usize,
     thread: thread::JoinHandle<()>,
 }
