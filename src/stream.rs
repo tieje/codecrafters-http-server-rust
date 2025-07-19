@@ -1,6 +1,6 @@
 use std::{io::{Read, Write}, net::TcpStream};
 
-use crate::{parsers::stream_parser, responses::request_handler};
+use crate::{controller::responses::{RequestHandler}, parsers::stream_parser};
 
 pub fn stream_handler(stream: TcpStream) {
     let stream_str = stream_reader(&stream);
@@ -8,8 +8,8 @@ pub fn stream_handler(stream: TcpStream) {
     let req = stream_parser(stream_str);
     // println!("req: {:#?}", req);
     match req {
-        Ok(r) => {
-            request_handler(stream, r);
+        Ok(req) => {
+            RequestHandler::new(stream, req).route_response();
         }
         Err(e) => {
             println!("{}", e)

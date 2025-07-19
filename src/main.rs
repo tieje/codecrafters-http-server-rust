@@ -1,7 +1,7 @@
 use std::net::TcpListener;
 use crate::{stream::stream_handler, threads::ThreadPool};
 
-mod responses;
+mod controller;
 mod stream;
 mod parsers;
 mod threads;
