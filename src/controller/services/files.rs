@@ -55,8 +55,10 @@ pub fn post(handle: RequestHandler) {
 
     let file = req.request_line.get_sub_path(&prefix);
     let file_path = Path::join(Path::new(DEFAULT_FOLDER_PATH), Path::new(&file));
+
     let mut f = File::create(file_path).expect("Could not create file");
     let _ = f.write_all(req.body.as_bytes());
+
     let res = Response {
         code: 201,
         status: Statuses::Created,
